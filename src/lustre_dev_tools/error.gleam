@@ -39,6 +39,10 @@ pub type Error {
   UnzipError(Dynamic)
   InvalidEsbuildBinary
   InvalidTailwindBinary
+
+  DependencyInstallationError(reason: String, package_manager: String)
+  DependencyNotFound(package: String)
+  DependencyFaulty(package: String)
 }
 
 // CONVERSIONS -----------------------------------------------------------------
@@ -71,6 +75,11 @@ pub fn explain(error: Error) -> Nil {
     UnzipError(error) -> unzip_error(error)
     InvalidEsbuildBinary -> invalid_esbuild_binary()
     InvalidTailwindBinary -> invalid_tailwind_binary()
+
+    DependencyInstallationError(reason, pm) ->
+      dependency_installation_error(reason, pm)
+    DependencyNotFound(package) -> dependency_not_found(package)
+    DependencyFaulty(package) -> dependency_faulty(package)
   }
   |> io.print_error
 }
@@ -612,4 +621,56 @@ fn pretty_var(id: Int) -> String {
       var
     }
   }
+}
+
+fn dependency_installation_error(reason: String, pm: String) -> String {
+  let message =
+    "
+I ran into an unexpected issue while trying to install dependencies using {pm}.
+Here's the error message I got:
+
+    {reason}
+
+If you think this is a bug, please open an issue at
+https://github.com/lustre-labs/dev-tools/issues/new with some details about what
+you were trying to do when you ran into this issue.
+"
+
+  message
+  |> string.replace("{reason}", reason)
+  |> string.replace("{pm}", pm)
+}
+
+fn dependency_not_found(package: String) -> String {
+  let message =
+    "
+I couldn't find the following package in your project's `package.json`:
+  
+      {package}
+
+Make sure the package is listed in your `package.json` file and installed.
+If you think this is a bug, please open an issue at
+https://github.com/lustre-labs/dev-tools/issues/new with some details about what
+you were trying to do when you ran into this issue.
+"
+
+  message
+  |> string.replace("{package}", package)
+}
+
+fn dependency_faulty(package: String) -> String {
+  let message =
+    "
+I ran into an issue while trying to get the main file for the following package:
+
+    {package}
+
+Make sure the package is installed and has a package.json with a `main` field that points to the main file.
+If you think this is a bug, please open an issue at
+https://github.com/lustre-labs/dev-tools/issues/new with some details about what
+you were trying to do when you ran into this issue.
+"
+
+  message
+  |> string.replace("{package}", package)
 }

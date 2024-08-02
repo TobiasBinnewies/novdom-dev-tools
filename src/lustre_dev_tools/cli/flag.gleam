@@ -40,11 +40,11 @@ pub fn tailwind_cpu() -> glint.Flag(String) {
   |> glint.flag_constraint(constraint.one_of(allowed))
 }
 
-pub fn minify() -> glint.Flag(Bool) {
+pub fn prod() -> glint.Flag(Bool) {
   let description =
-    "Minify the output, renaming variables and removing whitespace."
+    "Build for production. Minify the output, renaming variables and removing whitespace."
 
-  glint.bool_flag("minify")
+  glint.bool_flag("prod")
   |> glint.flag_help(description)
 }
 

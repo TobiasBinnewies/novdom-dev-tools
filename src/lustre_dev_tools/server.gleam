@@ -5,14 +5,19 @@ import gleam/bool
 import gleam/erlang/process
 import gleam/http/request.{type Request, Request}
 import gleam/http/response.{type Response}
+
 import gleam/io
+import gleam/list
 import gleam/option.{None, Some}
-import gleam/regex
+import gleam/regex.{Match}
 import gleam/result
+import gleam/string
 import gleam/string_builder
 import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cmd
-import lustre_dev_tools/error.{type Error, CannotStartDevServer}
+import lustre_dev_tools/error.{
+  type Error, CannotStartDevServer, DependencyNotFound,
+}
 import lustre_dev_tools/project
 import lustre_dev_tools/server/live_reload
 import lustre_dev_tools/server/proxy
@@ -23,6 +28,9 @@ import wisp
 pub fn start(port: Int) -> Cli(Nil) {
   let assert Ok(cwd) = cmd.cwd()
   let assert Ok(root) = filepath.expand(filepath.join(cwd, project.root()))
+  let assert Ok(build_dir) =
+    filepath.expand(filepath.join(cwd, project.build_dir(False)))
+  let assert Ok(source_dir) = filepath.expand(filepath.join(build_dir, ".."))
 
   use proxy <- do(proxy.get())
 
@@ -51,12 +59,15 @@ at https://github.com/lustre-labs/dev-tools/issues/new
         // message and get the client to hard refresh the page.
         ["lustre-dev-tools"] -> make_socket(req)
         [] ->
-          Request(..req, path: "/index.html")
-          |> wisp.mist_handler(handler(_, root), "")
+          Request(..req, path: build_dir <> "/index.html")
+          |> wisp.mist_handler(handler(_, build_dir), "")
+
+        ["javascript", ..] ->
+          wisp.mist_handler(src_handler(_, source_dir, build_dir), "")(req)
 
         // For everything else we're just going to serve any static files directly
         // from the project's root.
-        _ -> wisp.mist_handler(handler(_, root), "")(req)
+        _ -> wisp.mist_handler(handler(_, build_dir), "")(req)
       }
     }
     |> mist.new
@@ -66,6 +77,30 @@ at https://github.com/lustre-labs/dev-tools/issues/new
   )
 
   cli.return(process.sleep_forever())
+}
+
+fn src_handler(
+  req: wisp.Request,
+  src_root: String,
+  build_dir: String,
+) -> wisp.Response {
+  let src =
+    req
+    |> wisp.path_segments
+    |> string.join("/")
+    |> filepath.join(src_root, _)
+
+  case simplifile.is_file(src) {
+    Ok(False) | Error(_) -> wisp.response(404)
+    Ok(True) -> {
+      let assert Ok(content) = simplifile.read(src)
+
+      let content = project.replace_node_modules_with_relative_path(content)
+      wisp.response(200)
+      |> wisp.set_header("content-type", "text/javascript; charset=utf-8")
+      |> wisp.string_body(content)
+    }
+  }
 }
 
 fn handler(req: wisp.Request, root: String) -> wisp.Response {

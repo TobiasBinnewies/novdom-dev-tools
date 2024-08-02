@@ -1,14 +1,18 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import filepath
+import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type DecodeError, type Decoder, type Dynamic, DecodeError}
 import gleam/int
 import gleam/json
 import gleam/list
+import gleam/option.{Some}
 import gleam/package_interface.{type Type, Fn, Named, Tuple, Variable}
 import gleam/pair
+import gleam/regex.{type Match, Match}
 import gleam/result
+import gleam/set
 import gleam/string
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{type Error, BuildError}
@@ -31,6 +35,13 @@ pub type Module {
 
 pub type Function {
   Function(parameters: List(Type), return: Type)
+}
+
+pub type PackageJson {
+  PackageJson(
+    dependencies: Dict(String, String),
+    dev_dependencies: Dict(String, String),
+  )
 }
 
 // COMMANDS --------------------------------------------------------------------
@@ -110,6 +121,14 @@ pub fn config() -> Result(Config, Error) {
   Ok(Config(name: name, version: version, toml: toml))
 }
 
+pub fn package_json() -> Result(PackageJson, simplifile.FileError) {
+  use json <- result.try(simplifile.read("package.json"))
+
+  let assert Ok(package_json) = json.decode(json, package_json_decoder)
+
+  Ok(package_json)
+}
+
 // UTILS -----------------------------------------------------------------------
 
 /// Finds the path leading to the project's root folder. This recursively walks
@@ -125,6 +144,13 @@ fn find_root(path: String) -> String {
   case simplifile.is_file(toml) {
     Ok(False) | Error(_) -> find_root(filepath.join("..", path))
     Ok(True) -> path
+  }
+}
+
+pub fn build_dir(is_prod: Bool) -> String {
+  case is_prod {
+    True -> filepath.join(root(), "dist")
+    False -> filepath.join(root(), "build/dev/static")
   }
 }
 
@@ -149,6 +175,63 @@ pub fn type_to_string(type_: Type) -> String {
 
     Variable(id) -> "a_" <> int.to_string(id)
   }
+}
+
+pub fn all_node_modules() -> List(String) {
+  let src_dir = filepath.join(root(), "build/dev/javascript")
+  let assert Ok(files) = simplifile.get_files(src_dir)
+  {
+    use modules, file <- list.fold(files, set.new())
+    use <- bool.guard(!is_js(file), modules)
+    let assert Ok(src) = simplifile.read(file)
+    used_node_modules(src)
+    |> set.from_list
+    |> set.union(modules)
+  }
+  |> set.to_list
+}
+
+fn is_js(file: String) -> Bool {
+  case file |> filepath.extension |> result.unwrap("") {
+    "js" | "mjs" | "ts" ->
+      !{ file |> filepath.base_name |> string.contains("test") }
+    _ -> False
+  }
+}
+
+pub fn replace_node_modules_with_relative_path(src: String) -> String {
+  let modules = node_modules_matches(src)
+
+  let replacements = {
+    use module <- list.map(modules)
+
+    let assert Match(full, [Some(name)]) = module
+    let replacement = string.replace(full, name, "/modules/" <> name <> ".mjs")
+    #(name, replacement)
+  }
+
+  use src, replacement <- list.fold(replacements, src)
+
+  let assert Ok(to_replace) =
+    regex.from_string(
+      "(?:from|import) (?:\"|')(" <> replacement.0 <> ")(?:\"|')",
+    )
+  regex.replace(to_replace, src, replacement.1)
+}
+
+fn used_node_modules(src: String) -> List(String) {
+  let modules = node_modules_matches(src)
+
+  use module <- list.map(modules)
+
+  let assert Match(_, [Some(name)]) = module
+  name
+}
+
+fn node_modules_matches(src: String) -> List(Match) {
+  let assert Ok(modules) =
+    regex.from_string("(?:from|import) (?:\"|')([\\w|-]*)(?:\"|')")
+  let matches = regex.scan(modules, src)
 }
 
 // DECODERS --------------------------------------------------------------------
@@ -189,4 +272,12 @@ fn labelled_argument_decoder(dyn: Dynamic) -> Result(Type, List(DecodeError)) {
 
 fn string_dict(values: Decoder(a)) -> Decoder(Dict(String, a)) {
   dynamic.dict(dynamic.string, values)
+}
+
+fn package_json_decoder(dyn: Dynamic) -> Result(PackageJson, List(DecodeError)) {
+  dynamic.decode2(
+    PackageJson,
+    dynamic.field("dependencies", string_dict(dynamic.string)),
+    dynamic.field("devDependencies", string_dict(dynamic.string)),
+  )(dyn)
 }

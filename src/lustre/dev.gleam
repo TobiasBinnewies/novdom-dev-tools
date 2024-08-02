@@ -178,6 +178,7 @@ import argv
 import glint
 import lustre_dev_tools/cli/add
 import lustre_dev_tools/cli/build
+import lustre_dev_tools/cli/init
 import lustre_dev_tools/cli/start
 
 // MAIN ------------------------------------------------------------------------
@@ -200,8 +201,7 @@ pub fn main() {
   |> glint.add(at: ["add", "esbuild"], do: add.esbuild())
   |> glint.add(at: ["add", "tailwind"], do: add.tailwind())
   |> glint.add(at: ["build"], do: build.app())
-  |> glint.add(at: ["build", "app"], do: build.app())
-  |> glint.add(at: ["build", "component"], do: build.component())
   |> glint.add(at: ["start"], do: start.run())
+  |> glint.add(at: ["init"], do: init.command())
   |> glint.run(args)
 }

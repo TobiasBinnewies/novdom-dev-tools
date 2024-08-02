@@ -3,6 +3,7 @@
 import filepath
 import gleam/bool
 import gleam/dict
+
 import gleam/list
 import gleam/package_interface.{type Type, Named, Variable}
 import gleam/result
@@ -10,10 +11,11 @@ import gleam/string
 import glint.{type Command}
 import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cli/flag
+import lustre_dev_tools/cli/init
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, BundleError, ComponentMissing, MainMissing, ModuleMissing,
-  NameIncorrectType, NameMissing,
+  type Error, BundleError, CannotWriteFile, ComponentMissing, MainMissing,
+  ModuleMissing, NameIncorrectType, NameMissing,
 }
 import lustre_dev_tools/esbuild
 import lustre_dev_tools/project.{type Module}
@@ -42,14 +44,14 @@ JavaScript module for you to host or distribute.
 "
   use <- glint.command_help(description)
   use <- glint.unnamed_args(glint.EqArgs(0))
-  use minify <- glint.flag(flag.minify())
+  use is_prod <- glint.flag(flag.prod())
   use detect_tailwind <- glint.flag(flag.detect_tailwind())
   use _tailwind_entry <- glint.flag(flag.tailwind_entry())
   use _outdir <- glint.flag(flag.outdir())
   use _ext <- glint.flag(flag.ext())
   use _, _, flags <- glint.command()
   let script = {
-    use minify <- do(cli.get_bool("minify", False, ["build"], minify))
+    use is_prod <- do(cli.get_bool("prod", False, ["build"], is_prod))
     use detect_tailwind <- do(cli.get_bool(
       "detect-tailwind",
       True,
@@ -57,7 +59,7 @@ JavaScript module for you to host or distribute.
       detect_tailwind,
     ))
 
-    do_app(minify, detect_tailwind)
+    do_app(is_prod, detect_tailwind)
   }
 
   case cli.run(script, flags) {
@@ -66,7 +68,9 @@ JavaScript module for you to host or distribute.
   }
 }
 
-pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
+pub fn do_app(is_prod: Bool, detect_tailwind: Bool) -> Cli(Nil) {
+  use _ <- cli.do(init.install())
+
   use <- cli.log("Building your project")
   use project_name <- do(cli.get_name())
 
@@ -78,7 +82,7 @@ pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
   use <- cli.log("Creating the bundle entry file")
   let root = project.root()
   let tempdir = filepath.join(root, "build/.lustre")
-  let default_outdir = filepath.join(root, "priv/static")
+  let default_outdir = project.build_dir(is_prod)
   use outdir <- cli.do(
     cli.get_string(
       "outdir",
@@ -89,6 +93,9 @@ pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
   )
   let _ = simplifile.create_directory_all(tempdir)
   let _ = simplifile.create_directory_all(outdir)
+
+  use _ <- do(prepare_html(outdir, is_prod))
+
   use template <- cli.template("entry-with-main.mjs")
   let entry = string.replace(template, "{app_name}", project_name)
 
@@ -96,7 +103,7 @@ pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
   use ext <- cli.do(
     cli.get_string("ext", "mjs", ["build"], glint.get_flag(_, flag.ext())),
   )
-  let ext = case minify {
+  let ext = case is_prod {
     True -> ".min." <> ext
     False -> "." <> ext
   }
@@ -107,7 +114,7 @@ pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
     |> filepath.join(outdir, _)
 
   let assert Ok(_) = simplifile.write(entryfile, entry)
-  use _ <- do(bundle(entry, tempdir, outfile, minify))
+  use _ <- do(bundle(entry, tempdir, outfile, is_prod))
   use <- bool.guard(!detect_tailwind, cli.return(Nil))
 
   use entry <- cli.template("entry.css")
@@ -115,96 +122,9 @@ pub fn do_app(minify: Bool, detect_tailwind: Bool) -> Cli(Nil) {
     filepath.strip_extension(outfile)
     |> string.append(".css")
 
-  use _ <- do(bundle_tailwind(entry, tempdir, outfile, minify))
+  use _ <- do(bundle_tailwind(entry, tempdir, outfile, is_prod))
 
   cli.return(Nil)
-}
-
-pub fn component() -> Command(Nil) {
-  let description =
-    "
-Build a Lustre component as a portable Web Component. The generated JavaScript
-module can be included in any Web page and used without Gleam or Lustre being
-present.
-
-
-For a module to be built as a component, it must expose a `name` constant that
-will be the name of the component's HTML tag, and contain a public function that
-returns a suitable Lustre `App`.
-  "
-
-  use <- glint.command_help(description)
-  use module_path <- glint.named_arg("module_path")
-  use <- glint.unnamed_args(glint.EqArgs(0))
-  use minify <- glint.flag(flag.minify())
-  use _outdir <- glint.flag(flag.outdir())
-  use args, _, flags <- glint.command
-  let module_path = module_path(args)
-
-  let script = {
-    use minify <- do(cli.get_bool("minifiy", False, ["build"], minify))
-
-    use <- cli.log("Building your project")
-    use module <- try(get_module_interface(module_path))
-    use <- cli.success("Project compiled successfully")
-    use <- cli.log("Checking if I can bundle your component")
-    use _ <- try(check_component_name(module_path, module))
-    use component <- try(find_component(module_path, module))
-
-    use <- cli.log("Creating the bundle entry file")
-    let root = project.root()
-    let tempdir = filepath.join(root, "build/.lustre")
-    let default_outdir = filepath.join(root, "priv/static")
-    use outdir <- cli.do(
-      cli.get_string(
-        "outdir",
-        default_outdir,
-        ["build"],
-        glint.get_flag(_, flag.outdir()),
-      ),
-    )
-    let _ = simplifile.create_directory_all(tempdir)
-    let _ = simplifile.create_directory_all(outdir)
-
-    use project_name <- do(cli.get_name())
-
-    // Esbuild bundling
-    use template <- cli.template("component-entry.mjs")
-    let entry =
-      template
-      |> string.replace("{component_name}", importable_name(component))
-      |> string.replace("{app_name}", project_name)
-      |> string.replace("{module_path}", module_path)
-
-    let entryfile = filepath.join(tempdir, "entry.mjs")
-    let ext = case minify {
-      True -> ".min.mjs"
-      False -> ".mjs"
-    }
-    let assert Ok(outfile) =
-      string.split(module_path, "/")
-      |> list.last
-      |> result.map(string.append(_, ext))
-      |> result.map(filepath.join(outdir, _))
-
-    let assert Ok(_) = simplifile.write(entryfile, entry)
-    use _ <- do(bundle(entry, tempdir, outfile, minify))
-
-    // Tailwind bundling
-    use entry <- cli.template("entry.css")
-    let outfile =
-      filepath.strip_extension(outfile)
-      |> string.append(".css")
-
-    use _ <- do(bundle_tailwind(entry, tempdir, outfile, minify))
-
-    cli.return(Nil)
-  }
-
-  case cli.run(script, flags) {
-    Ok(_) -> Nil
-    Error(error) -> error.explain(error)
-  }
 }
 
 // STEPS -----------------------------------------------------------------------
@@ -227,49 +147,66 @@ fn check_main_function(
   }
 }
 
-fn check_component_name(
-  module_path: String,
-  module: Module,
-) -> Result(Nil, Error) {
-  dict.get(module.constants, "name")
-  |> result.replace_error(NameMissing(module_path))
-  |> result.then(fn(component_name) {
-    case is_string_type(component_name) {
-      True -> Ok(Nil)
-      False -> Error(NameIncorrectType(module_path, component_name))
+fn prepare_html(dir: String, is_prod: Bool) -> Cli(Nil) {
+  let index = filepath.join(dir, "index.html")
+
+  case simplifile.is_file(index) {
+    Ok(True) -> cli.return(Nil)
+    Ok(False) | Error(_) -> {
+      use html <- cli.template("index.html")
+      use app_name <- do(cli.get_name())
+      let app_name = case is_prod {
+        True -> app_name <> ".min"
+        False -> app_name
+      }
+      let html = string.replace(html, "{app_name}", app_name)
+      use _ <- try(write_html(index, html))
+
+      cli.return(Nil)
     }
-  })
+  }
 }
 
-fn find_component(module_path: String, module: Module) -> Result(String, Error) {
-  let functions = dict.to_list(module.functions)
-  let error = Error(ComponentMissing(module_path))
-
-  use _, #(name, t) <- list.fold_until(functions, error)
-  case t.parameters, is_compatible_app_type(t.return) {
-    [], True -> list.Stop(Ok(name))
-    _, _ -> list.Continue(error)
-  }
+fn write_html(path: String, source: String) -> Result(Nil, Error) {
+  simplifile.write(path, source)
+  |> result.map_error(CannotWriteFile(_, path))
 }
 
 fn bundle(
   entry: String,
   tempdir: String,
   outfile: String,
-  minify: Bool,
+  is_prod: Bool,
 ) -> Cli(Nil) {
   let entryfile = filepath.join(tempdir, "entry.mjs")
   let assert Ok(_) = simplifile.write(entryfile, entry)
-  use _ <- do(esbuild.bundle(entryfile, outfile, minify))
 
-  cli.return(Nil)
+  use _ <- cli.try(project.build())
+
+  case is_prod {
+    True -> {
+      use _ <- do(esbuild.bundle(entryfile, outfile, True))
+      cli.return(Nil)
+    }
+    False -> {
+      let entry = string.replace(entry, "/dev", "")
+      let assert Ok(_) = simplifile.write(outfile, entry)
+      let used_node_modules = project.all_node_modules()
+      use _ <- cli.do(esbuild.bundle_node_modules(
+        used_node_modules,
+        project.build_dir(False),
+      ))
+      use <- cli.success("Bundle produced at `" <> outfile <> "`")
+      cli.return(Nil)
+    }
+  }
 }
 
 fn bundle_tailwind(
   entry: String,
   tempdir: String,
   outfile: String,
-  minify: Bool,
+  is_prod: Bool,
 ) -> Cli(Nil) {
   // We first check if there's a `tailwind.config.js` at the project's root.
   // If not present we do nothing; otherwise we go on with bundling.
@@ -299,7 +236,7 @@ fn bundle_tailwind(
   }
 
   let flags = ["--input=" <> entryfile, "--output=" <> outfile]
-  let options = case minify {
+  let options = case is_prod {
     True -> ["--minify", ..flags]
     False -> flags
   }

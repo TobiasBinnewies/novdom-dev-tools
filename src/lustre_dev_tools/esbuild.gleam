@@ -4,13 +4,18 @@ import filepath
 import gleam/bit_array
 import gleam/crypto
 import gleam/dynamic.{type Dynamic}
+import gleam/io
+import gleam/json
+import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/set
 import lustre_dev_tools/cli.{type Cli}
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, BundleError, CannotSetPermissions, CannotWriteFile, NetworkError,
-  UnknownPlatform, UnzipError,
+  type Error, BundleError, CannotSetPermissions, CannotWriteFile,
+  DependencyFaulty, DependencyNotFound, NetworkError, UnknownPlatform,
+  UnzipError,
 }
 import lustre_dev_tools/esbuild/preprocess
 import lustre_dev_tools/project
@@ -52,9 +57,12 @@ pub fn download(os: String, cpu: String) -> Cli(Nil) {
   }
 }
 
-pub fn bundle(input_file: String, output_file: String, minify: Bool) -> Cli(Nil) {
+pub fn bundle(
+  input_file: String,
+  output_file: String,
+  is_prod: Bool,
+) -> Cli(Nil) {
   use _ <- cli.do(download(get_os(), get_cpu()))
-  use _ <- cli.try(project.build())
 
   let root = project.root()
   let flags = [
@@ -63,7 +71,7 @@ pub fn bundle(input_file: String, output_file: String, minify: Bool) -> Cli(Nil)
     "--format=esm",
     "--outfile=" <> output_file,
   ]
-  let options = case minify {
+  let options = case is_prod {
     True -> [input_file, "--minify", ..flags]
     False -> [input_file, ..flags]
   }
@@ -75,6 +83,77 @@ pub fn bundle(input_file: String, output_file: String, minify: Bool) -> Cli(Nil)
 
   use <- cli.success("Bundle produced at `" <> output_file <> "`")
   cli.return(Nil)
+}
+
+pub fn bundle_node_modules(modules: List(String), build_dir: String) -> Cli(Nil) {
+  use <- cli.log("Bundling all used node modules")
+
+  use _ <- cli.do(download(get_os(), get_cpu()))
+
+  let dir = filepath.join(build_dir, "modules")
+
+  use _ <- cli.try({
+    use module_name <- list.try_each(modules)
+    use module_main <- result.try(get_module_main(module_name))
+
+    let output_file = filepath.join(dir, module_name <> ".mjs")
+
+    let options = [
+      module_main,
+      "--bundle",
+      "--external:node:*",
+      "--format=esm",
+      "--tree-shaking=false",
+      "--outfile=" <> output_file,
+    ]
+    
+    exec_esbuild(project.root(), options)
+  })
+
+  use <- cli.success("Bundled all node modules at `" <> dir <> "`")
+  cli.return(Nil)
+}
+
+fn get_module_main(name: String) -> Result(String, Error) {
+  let root = project.root()
+  let module = filepath.join(root, "node_modules/" <> name)
+  let module_json = filepath.join(module, "package.json")
+
+  case simplifile.is_directory(module) {
+    Ok(False) | Error(_) -> Error(DependencyNotFound(name))
+    Ok(True) -> {
+      use json <- result.try(
+        simplifile.read(module_json)
+        |> result.replace_error(DependencyFaulty(name)),
+      )
+      use main_file <- result.try(
+        module_main_file(json) |> result.replace_error(DependencyFaulty(name)),
+      )
+
+      let assert Ok(main) = filepath.expand(filepath.join(module, main_file))
+      Ok(main)
+    }
+  }
+}
+
+type PackageJson {
+  PackageJson(main: String, exports: Option(String))
+}
+
+fn module_main_file(json: String) -> Result(String, json.DecodeError) {
+  let dot_encoder = dynamic.field("import", dynamic.string)
+  let exports_decoder = dynamic.field(".", dot_encoder)
+  let decoder =
+    dynamic.decode2(
+      PackageJson,
+      dynamic.field("main", dynamic.string),
+      dynamic.optional_field("exports", exports_decoder),
+    )
+  use package_json <- result.map(json.decode(json, decoder))
+  case package_json.exports {
+    Some(exports) -> exports
+    None -> package_json.main
+  }
 }
 
 // STEPS -----------------------------------------------------------------------
