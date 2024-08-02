@@ -102,3 +102,13 @@ pub fn proxy_to() -> glint.Flag(String) {
   glint.string_flag("proxy-to")
   |> glint.flag_help(description)
 }
+
+pub fn package_manager() -> glint.Flag(String) {
+  let description =
+    "Use a package manager other than the default (bun) for the project."
+  let allowed = ["bun", "npm", "yarn", "pnpm"]
+
+  glint.string_flag("pm")
+  |> glint.flag_help(description)
+  |> glint.flag_constraint(constraint.one_of(allowed))
+}

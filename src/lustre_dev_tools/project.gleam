@@ -7,7 +7,7 @@ import gleam/dynamic.{type DecodeError, type Decoder, type Dynamic, DecodeError}
 import gleam/int
 import gleam/json
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{type Option, Some, None}
 import gleam/package_interface.{type Type, Fn, Named, Tuple, Variable}
 import gleam/pair
 import gleam/regex.{type Match, Match}
@@ -18,6 +18,12 @@ import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{type Error, BuildError}
 import simplifile
 import tom.{type Toml}
+
+// CONFIG ----------------------------------------------------------------------
+
+pub const needed_node_modules = ["quill", "tailwind-merge"]
+
+pub const needed_dev_node_modules = ["jsdom"]
 
 // TYPES -----------------------------------------------------------------------
 
@@ -39,8 +45,8 @@ pub type Function {
 
 pub type PackageJson {
   PackageJson(
-    dependencies: Dict(String, String),
-    dev_dependencies: Dict(String, String),
+    dependencies: Option(Dict(String, String)),
+    dev_dependencies: Option(Dict(String, String)),
   )
 }
 
@@ -119,6 +125,39 @@ pub fn config() -> Result(Config, Error) {
   let assert Ok(version) = tom.get_string(toml, ["version"])
 
   Ok(Config(name: name, version: version, toml: toml))
+}
+
+pub fn all_node_modules_installed() -> Bool {
+  case package_json() {
+    Error(_) -> {
+      False
+    }
+    Ok(package_json) -> {
+      let dependencies = package_json.dependencies
+      let dev_dependencies = package_json.dev_dependencies
+
+      let has_dependencies =
+        check_if_all_dependencies_installed(dependencies, needed_node_modules)
+      let has_dev_dependencies =
+        check_if_all_dependencies_installed(
+          dev_dependencies,
+          needed_dev_node_modules,
+        )
+
+      has_dependencies && has_dev_dependencies
+    }
+  }
+}
+
+fn check_if_all_dependencies_installed(
+  installed: Option(Dict(String, String)),
+  needed: List(String),
+) {
+  case installed {
+    None -> False
+    Some(installed) ->
+      list.all(needed, fn(dep) { dict.has_key(installed, dep) })
+  }
 }
 
 pub fn package_json() -> Result(PackageJson, simplifile.FileError) {
@@ -231,7 +270,7 @@ fn used_node_modules(src: String) -> List(String) {
 fn node_modules_matches(src: String) -> List(Match) {
   let assert Ok(modules) =
     regex.from_string("(?:from|import) (?:\"|')([\\w|-]*)(?:\"|')")
-  let matches = regex.scan(modules, src)
+  regex.scan(modules, src)
 }
 
 // DECODERS --------------------------------------------------------------------
@@ -277,7 +316,7 @@ fn string_dict(values: Decoder(a)) -> Decoder(Dict(String, a)) {
 fn package_json_decoder(dyn: Dynamic) -> Result(PackageJson, List(DecodeError)) {
   dynamic.decode2(
     PackageJson,
-    dynamic.field("dependencies", string_dict(dynamic.string)),
-    dynamic.field("devDependencies", string_dict(dynamic.string)),
+    dynamic.optional_field("dependencies", string_dict(dynamic.string)),
+    dynamic.optional_field("devDependencies", string_dict(dynamic.string)),
   )(dyn)
 }

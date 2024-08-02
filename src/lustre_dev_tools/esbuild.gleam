@@ -4,7 +4,6 @@ import filepath
 import gleam/bit_array
 import gleam/crypto
 import gleam/dynamic.{type Dynamic}
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -106,7 +105,7 @@ pub fn bundle_node_modules(modules: List(String), build_dir: String) -> Cli(Nil)
       "--tree-shaking=false",
       "--outfile=" <> output_file,
     ]
-    
+
     exec_esbuild(project.root(), options)
   })
 

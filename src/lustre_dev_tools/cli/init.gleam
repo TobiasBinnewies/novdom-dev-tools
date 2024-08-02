@@ -1,88 +1,77 @@
-import filepath
-import gleam/dict.{type Dict}
-
-import gleam/list
 import gleam/result
-import gleam/string
 import glint.{type Command}
 import lustre_dev_tools/cli.{type Cli}
+import lustre_dev_tools/cli/flag
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, CannotWriteFile, DependencyInstallationError,
+  type Error, DependencyInstallationError,
 }
-import lustre_dev_tools/project.{type PackageJson}
-import simplifile
+import lustre_dev_tools/project.{needed_dev_node_modules, needed_node_modules}
 
 pub fn command() -> Command(Nil) {
   let description = "Installing JavaScript dependencies"
 
   use <- glint.command_help(description)
   use <- glint.unnamed_args(glint.EqArgs(0))
+  use pm <- glint.flag(flag.package_manager())
   use _, _, flags <- glint.command()
 
-  case cli.run(install(), flags) {
+  let script = {
+    use pm <- cli.do(cli.get_string("package-manager", "bun", ["init"], pm))
+
+    init(pm)
+  }
+
+  case cli.run(script, flags) {
     Ok(_) -> Nil
     Error(error) -> error.explain(error)
   }
 }
 
-pub fn install() -> Cli(Nil) {
+pub fn init(pm: String) -> Cli(Nil) {
   use <- cli.log("Installing JavaScript dependencies")
 
   let root = project.root()
 
-  let dependencies = ["quill", "tailwind-merge"]
-  let dev_dependencies = ["jsdom"]
-
-  case project.package_json() {
-    Ok(package_json) -> {
-      // check if all dependencies are already installed
-      let has_dependencies =
-        check_if_all_dependencies_installed(
-          package_json.dependencies,
-          dependencies,
-        )
-      let has_dev_dependencies =
-        check_if_all_dependencies_installed(
-          package_json.dev_dependencies,
-          dev_dependencies,
-        )
-      case has_dependencies && has_dev_dependencies {
-        True -> {
-          use <- cli.success("All dependencies already installed!")
-          cli.return(Nil)
-        }
-        False -> do_install(root, dependencies, dev_dependencies)
-      }
+  case project.all_node_modules_installed() {
+    True -> {
+      use <- cli.success("All dependencies already installed!")
+      cli.return(Nil)
     }
-    Error(_) -> do_install(root, dependencies, dev_dependencies)
+    False -> do_install(pm, root, needed_node_modules, needed_dev_node_modules)
   }
 }
 
-fn check_if_all_dependencies_installed(
-  installed: Dict(String, String),
-  needed: List(String),
-) {
-  use dep <- list.all(needed)
-  dict.has_key(installed, dep)
-}
-
-fn do_install(root, dependencies, dev_dependencies) -> Cli(Nil) {
+fn do_install(pm, root, dependencies, dev_dependencies) -> Cli(Nil) {
   let install_dev_result =
-    cmd.exec(run: "bun", in: root, with: [
-      "install",
-      "--dev",
+    cmd.exec(run: pm, in: root, with: [
+      install_command(pm),
+      dev_flag(pm),
       ..dev_dependencies
     ])
-    |> result.map_error(fn(pair) { DependencyInstallationError(pair.1, "bun") })
+    |> result.map_error(fn(pair) { DependencyInstallationError(pair.1, pm) })
   use _ <- cli.try(install_dev_result)
 
   let install_result =
-    cmd.exec(run: "bun", in: root, with: ["install", ..dependencies])
-    |> result.map_error(fn(pair) { DependencyInstallationError(pair.1, "bun") })
+    cmd.exec(run: pm, in: root, with: [install_command(pm), ..dependencies])
+    |> result.map_error(fn(pair) { DependencyInstallationError(pair.1, pm) })
   use _ <- cli.try(install_result)
 
   use <- cli.success("Dependencies installed!")
 
   cli.return(Nil)
+}
+
+fn dev_flag(pm) -> String {
+  case pm {
+    "yarn" | "bun" -> "--dev"
+    _ -> "--save-dev"
+  }
+}
+
+fn install_command(pm) -> String {
+  case pm {
+    "yarn" -> "add"
+    _ -> "install"
+  }
 }

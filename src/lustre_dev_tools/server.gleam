@@ -7,16 +7,15 @@ import gleam/http/request.{type Request, Request}
 import gleam/http/response.{type Response}
 
 import gleam/io
-import gleam/list
 import gleam/option.{None, Some}
-import gleam/regex.{Match}
+import gleam/regex
 import gleam/result
 import gleam/string
 import gleam/string_builder
 import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, CannotStartDevServer, DependencyNotFound,
+  type Error, CannotStartDevServer,
 }
 import lustre_dev_tools/project
 import lustre_dev_tools/server/live_reload
@@ -63,7 +62,7 @@ at https://github.com/lustre-labs/dev-tools/issues/new
           |> wisp.mist_handler(handler(_, build_dir), "")
 
         ["javascript", ..] ->
-          wisp.mist_handler(src_handler(_, source_dir, build_dir), "")(req)
+          wisp.mist_handler(src_handler(_, source_dir), "")(req)
 
         // For everything else we're just going to serve any static files directly
         // from the project's root.
@@ -82,7 +81,6 @@ at https://github.com/lustre-labs/dev-tools/issues/new
 fn src_handler(
   req: wisp.Request,
   src_root: String,
-  build_dir: String,
 ) -> wisp.Response {
   let src =
     req

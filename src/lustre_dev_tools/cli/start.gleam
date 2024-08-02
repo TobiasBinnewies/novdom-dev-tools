@@ -1,18 +1,12 @@
 // IMPORTS ---------------------------------------------------------------------
 
-import filepath
-
-import gleam/result
-import gleam/string
 import glint.{type Command}
-import lustre_dev_tools/cli.{type Cli, do, try}
+import lustre_dev_tools/cli.{type Cli, do}
 import lustre_dev_tools/cli/build
 import lustre_dev_tools/cli/flag
-import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{type Error}
 import lustre_dev_tools/project
 import lustre_dev_tools/server
-import simplifile
 
 // COMMANDS --------------------------------------------------------------------
 

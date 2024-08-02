@@ -3,19 +3,16 @@
 import filepath
 import gleam/bool
 import gleam/dict
-
-import gleam/list
 import gleam/package_interface.{type Type, Named, Variable}
 import gleam/result
 import gleam/string
 import glint.{type Command}
 import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cli/flag
-import lustre_dev_tools/cli/init
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, BundleError, CannotWriteFile, ComponentMissing, MainMissing,
-  ModuleMissing, NameIncorrectType, NameMissing,
+  type Error, BundleError, CannotWriteFile, MainMissing,
+  ModuleMissing,
 }
 import lustre_dev_tools/esbuild
 import lustre_dev_tools/project.{type Module}
@@ -69,8 +66,6 @@ JavaScript module for you to host or distribute.
 }
 
 pub fn do_app(is_prod: Bool, detect_tailwind: Bool) -> Cli(Nil) {
-  use _ <- cli.do(init.install())
-
   use <- cli.log("Building your project")
   use project_name <- do(cli.get_name())
 
