@@ -9,7 +9,7 @@ import lustre_dev_tools/error.{
 import lustre_dev_tools/project.{needed_dev_node_modules, needed_node_modules}
 
 pub fn command() -> Command(Nil) {
-  let description = "Installing JavaScript dependencies"
+  let description = "Installing JavaScript dependencies & adding tailwind"
 
   use <- glint.command_help(description)
   use <- glint.unnamed_args(glint.EqArgs(0))
