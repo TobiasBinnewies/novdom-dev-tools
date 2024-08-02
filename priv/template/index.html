@@ -39,15 +39,4 @@
       --mouse-y: 0;
     }
   </style>
-
-  <script>
-    const drag = document.getElementById("_drag_")
-
-    const mousemove = (e) => {
-      drag.style.setProperty("--mouse-x", e.clientX + "px")
-      drag.style.setProperty("--mouse-y", e.clientY + "px")
-    }
-
-    document.addEventListener("mousemove", mousemove)
-  </script>
 </html>
