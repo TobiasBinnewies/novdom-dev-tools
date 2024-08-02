@@ -1,15 +1,11 @@
-name = "lustre_dev_tools"
-version = "1.4.2"
+name = "novdom_dev_tools"
+version = "0.1.0"
 target = "erlang"
 gleam = ">= 1.1.0"
 
-description = "Lustre's official CLI and development tooling."
-repository = { type = "github", user = "lustre-labs", repo = "dev-tools" }
+description = "Development Tooling and CLI for the novdom framework."
+repository = { type = "github", user = "TobiasBinnewies", repo = "novdom_dev_tools" }
 licences = ["MIT"]
-
-links = [
-  { title = "Sponsor", href = "https://github.com/sponsors/hayleigh-dot-dev" },
-]
 
 internal_modules = ["lustre_dev_tools", "lustre_dev_tools/*"]
 
