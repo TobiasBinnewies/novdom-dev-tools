@@ -67,7 +67,7 @@ pub fn start(
 }
 
 pub fn inject(html: String) -> String {
-  let assert Ok(priv) = erlang.priv_directory("lustre_dev_tools")
+  let assert Ok(priv) = erlang.priv_directory("novdom_dev_tools")
   let assert Ok(source) = simplifile.read(priv <> "/server/live-reload.js")
   let script = "<script>" <> source <> "</script>"
 
