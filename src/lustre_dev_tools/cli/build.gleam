@@ -14,6 +14,7 @@ import lustre_dev_tools/error.{
   type Error, BundleError, CannotWriteFile, MainMissing, ModuleMissing,
 }
 import lustre_dev_tools/esbuild
+import lustre_dev_tools/packages
 import lustre_dev_tools/project.{type Module}
 import lustre_dev_tools/tailwind
 import simplifile
@@ -176,6 +177,9 @@ fn bundle(
   let assert Ok(_) = simplifile.write(entryfile, entry)
 
   use _ <- cli.try(project.build())
+
+  use _ <- cli.do(packages.install(""))
+  use _ <- cli.do(tailwind.setup(get_os(), get_cpu()))
 
   case is_prod {
     True -> {

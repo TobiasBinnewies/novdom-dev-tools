@@ -14,7 +14,13 @@ pub fn install(pm: String) -> Cli(Nil) {
       use <- cli.success("All packages already installed!")
       cli.return(Nil)
     }
-    False -> do_install(pm, root, needed_node_modules, needed_dev_node_modules)
+    False -> {
+      let pm = case pm {
+        "" -> project.used_package_manager()
+        _ -> pm
+      }
+      do_install(pm, root, needed_node_modules, needed_dev_node_modules)
+    }
   }
 }
 

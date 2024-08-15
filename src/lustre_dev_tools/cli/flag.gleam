@@ -105,7 +105,7 @@ pub fn proxy_to() -> glint.Flag(String) {
 
 pub fn package_manager() -> glint.Flag(String) {
   let description =
-    "Use a package manager other than the default (bun) for the project."
+    "Specify the package manager that is used to install the packages. If not specified, the package manager is determined by the existing lock file, if none is available `bun` is used."
   let allowed = ["bun", "npm", "yarn", "pnpm"]
 
   glint.string_flag("pm")

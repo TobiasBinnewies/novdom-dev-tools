@@ -286,6 +286,26 @@ fn node_modules_matches(src: String) -> List(Match) {
   regex.scan(modules, src)
 }
 
+pub fn used_package_manager() -> String {
+  use <- bool.guard(
+    simplifile.is_file("bun.lockb") |> result.unwrap(False),
+    "bun",
+  )
+  use <- bool.guard(
+    simplifile.is_file("yarn.lock") |> result.unwrap(False),
+    "yarn",
+  )
+  use <- bool.guard(
+    simplifile.is_file("package-lock.json") |> result.unwrap(False),
+    "npm",
+  )
+  use <- bool.guard(
+    simplifile.is_file("pnpm-lock.yaml") |> result.unwrap(False),
+    "pnpm",
+  )
+  "bun"
+}
+
 // DECODERS --------------------------------------------------------------------
 
 fn interface_decoder(dyn: Dynamic) -> Result(Interface, List(DecodeError)) {

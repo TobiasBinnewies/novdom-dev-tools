@@ -51,7 +51,7 @@ Download a platform-appropriate version of the Tailwind binary. Lustre will
 automatically use this to compile your styles if it detects a `tailwind.config.js`
 in your project but will not download it automatically.
     "
-    
+
   use <- glint.command_help(description)
   use <- glint.unnamed_args(glint.EqArgs(0))
   use os <- glint.flag(flag.tailwind_os())
@@ -73,7 +73,7 @@ in your project but will not download it automatically.
 pub fn packages() -> Command(Nil) {
   let description =
     "
-  Install required javascript packages using the package manager of your choice. The default package manager that is used is `bun`. This will generate a `package.json` file in the root of your project if one does not already exist.
+  Install required javascript packages using the package manager of your choice. The package manager used is determined by an existing lock file, if none is available `bun` is used. This will generate a `package.json` file in the root of your project if it does not already exist.
     "
 
   use <- glint.command_help(description)
@@ -82,7 +82,7 @@ pub fn packages() -> Command(Nil) {
   use _, _, flags <- glint.command()
 
   let script = {
-    use pm <- cli.do(cli.get_string("package-manager", "bun", ["init"], pm))
+    use pm <- cli.do(cli.get_string("package-manager", "", ["init"], pm))
 
     packages.install(pm)
   }
