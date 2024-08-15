@@ -14,9 +14,7 @@ import gleam/string
 import gleam/string_builder
 import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cmd
-import lustre_dev_tools/error.{
-  type Error, CannotStartDevServer,
-}
+import lustre_dev_tools/error.{type Error, CannotStartDevServer}
 import lustre_dev_tools/project
 import lustre_dev_tools/server/live_reload
 import lustre_dev_tools/server/proxy
@@ -78,10 +76,7 @@ at https://github.com/lustre-labs/dev-tools/issues/new
   cli.return(process.sleep_forever())
 }
 
-fn src_handler(
-  req: wisp.Request,
-  src_root: String,
-) -> wisp.Response {
+fn src_handler(req: wisp.Request, src_root: String) -> wisp.Response {
   let src =
     req
     |> wisp.path_segments

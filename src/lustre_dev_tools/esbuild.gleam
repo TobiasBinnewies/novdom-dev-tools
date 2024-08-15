@@ -12,9 +12,8 @@ import gleam/set
 import lustre_dev_tools/cli.{type Cli}
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, BundleError, CannotSetPermissions, CannotWriteFile,
-  DependencyFaulty, DependencyNotFound, NetworkError, UnknownPlatform,
-  UnzipError,
+  type Error, BundleError, CannotSetPermissions, CannotWriteFile, NetworkError,
+  PackageFaulty, PackageNotFound, UnknownPlatform, UnzipError,
 }
 import lustre_dev_tools/esbuild/preprocess
 import lustre_dev_tools/project
@@ -61,6 +60,7 @@ pub fn bundle(
   output_file: String,
   is_prod: Bool,
 ) -> Cli(Nil) {
+  
   use _ <- cli.do(download(get_os(), get_cpu()))
 
   let root = project.root()
@@ -119,14 +119,14 @@ fn get_module_main(name: String) -> Result(String, Error) {
   let module_json = filepath.join(module, "package.json")
 
   case simplifile.is_directory(module) {
-    Ok(False) | Error(_) -> Error(DependencyNotFound(name))
+    Ok(False) | Error(_) -> Error(PackageNotFound(name))
     Ok(True) -> {
       use json <- result.try(
         simplifile.read(module_json)
-        |> result.replace_error(DependencyFaulty(name)),
+        |> result.replace_error(PackageFaulty(name)),
       )
       use main_file <- result.try(
-        module_main_file(json) |> result.replace_error(DependencyFaulty(name)),
+        module_main_file(json) |> result.replace_error(PackageFaulty(name)),
       )
 
       let assert Ok(main) = filepath.expand(filepath.join(module, main_file))

@@ -7,7 +7,7 @@ import gleam/dynamic.{type DecodeError, type Decoder, type Dynamic, DecodeError}
 import gleam/int
 import gleam/json
 import gleam/list
-import gleam/option.{type Option, Some, None}
+import gleam/option.{type Option, None, Some}
 import gleam/package_interface.{type Type, Fn, Named, Tuple, Variable}
 import gleam/pair
 import gleam/regex.{type Match, Match}
@@ -137,9 +137,9 @@ pub fn all_node_modules_installed() -> Bool {
       let dev_dependencies = package_json.dev_dependencies
 
       let has_dependencies =
-        check_if_all_dependencies_installed(dependencies, needed_node_modules)
+        check_if_all_packages_installed(dependencies, needed_node_modules)
       let has_dev_dependencies =
-        check_if_all_dependencies_installed(
+        check_if_all_packages_installed(
           dev_dependencies,
           needed_dev_node_modules,
         )
@@ -149,14 +149,27 @@ pub fn all_node_modules_installed() -> Bool {
   }
 }
 
-fn check_if_all_dependencies_installed(
+fn check_if_all_packages_installed(
   installed: Option(Dict(String, String)),
   needed: List(String),
 ) {
+  let root = root()
+  let modules = filepath.join(root, "node_modules")
   case installed {
     None -> False
     Some(installed) ->
-      list.all(needed, fn(dep) { dict.has_key(installed, dep) })
+      list.all(needed, fn(dep) {
+        case dict.has_key(installed, dep) {
+          True -> {
+            let module = filepath.join(modules, dep)
+            case simplifile.is_directory(module) {
+              Ok(True) -> True
+              Ok(False) | Error(_) -> False
+            }
+          }
+          False -> False
+        }
+      })
   }
 }
 

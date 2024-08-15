@@ -5,6 +5,7 @@ import lustre_dev_tools/cli.{do}
 import lustre_dev_tools/cli/flag
 import lustre_dev_tools/error
 import lustre_dev_tools/esbuild
+import lustre_dev_tools/packages
 import lustre_dev_tools/tailwind
 
 // DESCRIPTION -----------------------------------------------------------------
@@ -50,6 +51,7 @@ Download a platform-appropriate version of the Tailwind binary. Lustre will
 automatically use this to compile your styles if it detects a `tailwind.config.js`
 in your project but will not download it automatically.
     "
+    
   use <- glint.command_help(description)
   use <- glint.unnamed_args(glint.EqArgs(0))
   use os <- glint.flag(flag.tailwind_os())
@@ -60,6 +62,29 @@ in your project but will not download it automatically.
     use cpu <- do(cli.get_string("cpu", get_cpu(), ["add"], cpu))
 
     tailwind.setup(os, cpu)
+  }
+
+  case cli.run(script, flags) {
+    Ok(_) -> Nil
+    Error(error) -> error.explain(error)
+  }
+}
+
+pub fn packages() -> Command(Nil) {
+  let description =
+    "
+  Install required javascript packages using the package manager of your choice. The default package manager that is used is `bun`. This will generate a `package.json` file in the root of your project if one does not already exist.
+    "
+
+  use <- glint.command_help(description)
+  use <- glint.unnamed_args(glint.EqArgs(0))
+  use pm <- glint.flag(flag.package_manager())
+  use _, _, flags <- glint.command()
+
+  let script = {
+    use pm <- cli.do(cli.get_string("package-manager", "bun", ["init"], pm))
+
+    packages.install(pm)
   }
 
   case cli.run(script, flags) {

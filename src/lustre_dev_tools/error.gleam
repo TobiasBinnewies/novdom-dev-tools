@@ -40,9 +40,9 @@ pub type Error {
   InvalidEsbuildBinary
   InvalidTailwindBinary
 
-  DependencyInstallationError(reason: String, package_manager: String)
-  DependencyNotFound(package: String)
-  DependencyFaulty(package: String)
+  PackageInstallationError(reason: String, package_manager: String)
+  PackageNotFound(package: String)
+  PackageFaulty(package: String)
 }
 
 // CONVERSIONS -----------------------------------------------------------------
@@ -76,10 +76,10 @@ pub fn explain_to_string(error: Error) -> String {
     InvalidEsbuildBinary -> invalid_esbuild_binary()
     InvalidTailwindBinary -> invalid_tailwind_binary()
 
-    DependencyInstallationError(reason, pm) ->
-      dependency_installation_error(reason, pm)
-    DependencyNotFound(package) -> dependency_not_found(package)
-    DependencyFaulty(package) -> dependency_faulty(package)
+    PackageInstallationError(reason, pm) ->
+      package_installation_error(reason, pm)
+    PackageNotFound(package) -> package_not_found(package)
+    PackageFaulty(package) -> package_faulty(package)
   }
 }
 
@@ -628,10 +628,10 @@ fn pretty_var(id: Int) -> String {
   }
 }
 
-fn dependency_installation_error(reason: String, pm: String) -> String {
+fn package_installation_error(reason: String, pm: String) -> String {
   let message =
     "
-I ran into an unexpected issue while trying to install dependencies using {pm}.
+I ran into an unexpected issue while trying to install required javascript packages using {pm}.
 Here's the error message I got:
 
     {reason}
@@ -646,7 +646,7 @@ you were trying to do when you ran into this issue.
   |> string.replace("{pm}", pm)
 }
 
-fn dependency_not_found(package: String) -> String {
+fn package_not_found(package: String) -> String {
   let message =
     "
 I couldn't find the following package in your project's `package.json`:
@@ -663,7 +663,7 @@ you were trying to do when you ran into this issue.
   |> string.replace("{package}", package)
 }
 
-fn dependency_faulty(package: String) -> String {
+fn package_faulty(package: String) -> String {
   let message =
     "
 I ran into an issue while trying to get the main file for the following package:

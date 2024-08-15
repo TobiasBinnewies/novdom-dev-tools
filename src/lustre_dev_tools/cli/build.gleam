@@ -11,8 +11,7 @@ import lustre_dev_tools/cli.{type Cli, do, try}
 import lustre_dev_tools/cli/flag
 import lustre_dev_tools/cmd
 import lustre_dev_tools/error.{
-  type Error, BundleError, CannotWriteFile, MainMissing,
-  ModuleMissing,
+  type Error, BundleError, CannotWriteFile, MainMissing, ModuleMissing,
 }
 import lustre_dev_tools/esbuild
 import lustre_dev_tools/project.{type Module}
