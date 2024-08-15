@@ -1,7 +1,11 @@
 module.exports = {
-  content: ["./index.html", "./src/**/*.{gleam,mjs}"],
+  content: [
+    "./src/**/*.{gleam,mjs}",
+    "./build/dev/javascript/**/*.mjs",
+    "./build/dev/static/**/*.{html,mjs,css}",
+  ],
   theme: {
     extend: {},
   },
   plugins: [],
-};
+}
