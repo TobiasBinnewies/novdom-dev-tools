@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+
     <title>🚧 {app_name}</title>
-    
+
     <!-- Remove this if you dont use TailwindCSS integration -->
     <link rel="stylesheet" type="text/css" href="./{app_name}.css" />
     <script type="module" src="./{app_name}.mjs"></script>
@@ -37,6 +37,16 @@
 
       --mouse-x: 0;
       --mouse-y: 0;
+    }
+
+    .replacement-transition {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .replacement-transition * {
+      grid-row-start: 1;
+      grid-column-start: 1;
     }
   </style>
 </html>
