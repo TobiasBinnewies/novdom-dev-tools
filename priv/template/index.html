@@ -1,22 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>🚧 {app_name}</title>
-
-    <!-- Remove this if you dont use TailwindCSS integration -->
-    <link rel="stylesheet" type="text/css" href="./{app_name}.css" />
-    <script type="module" src="./{app_name}.mjs"></script>
-  </head>
-
-  <body>
-    <div id="_unrendered_" hidden></div>
-    <div id="_app_"></div>
-    <div id="_drag_"></div>
-  </body>
-
   <style>
     html,
     body,
@@ -38,15 +21,56 @@
       --mouse-x: 0;
       --mouse-y: 0;
     }
+    #_drag_ > * {
+      position: absolute;
+      top: var(--mouse-y);
+      left: var(--mouse-x);
+    }
 
-    .replacement-transition {
+    /* zstack */
+    .zstack {
+      height: 100%;
+      width: 100%;
       display: grid;
       grid-template-columns: 1fr;
+      /* align-items: start | center | end; */
+      /* justify-items: left | center | right; */
     }
 
-    .replacement-transition * {
+    .zstack * {
       grid-row-start: 1;
       grid-column-start: 1;
+      /* display: flex; */
+      /* flex-grow: 1; */
+      /* width: 100%; */
+      /* background: red; */
+      /* opacity: 0.5; */
+      /* height: 100%; */
+    }
+
+    .stack {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      pointer-events: none;
+    }
+    .stack * {
+      pointer-events: auto;
     }
   </style>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>🚧 app</title>
+
+    <!-- Remove this if you dont use TailwindCSS integration -->
+    <link rel="stylesheet" type="text/css" href="./app.css" />
+    <script type="module" src="./app.mjs"></script>
+  </head>
+  <body>
+    <div id="_unrendered_" hidden></div>
+    <div id="_app_"></div>
+    <div id="_drag_"></div>
+  </body>
 </html>

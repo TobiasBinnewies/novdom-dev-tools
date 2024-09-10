@@ -1,3 +1,4 @@
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./src/**/*.{gleam,mjs}",
@@ -8,4 +9,5 @@ module.exports = {
     extend: {},
   },
   plugins: [],
+  important: true,
 }
